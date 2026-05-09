@@ -91,10 +91,13 @@ class FA:
         for i in range(len(distributes[0])):
             for j in range(len(self.terminal_set)):
                 symbol = sorted(self.terminal_set)[j]
-                if self.delta_functions.loc[distributes[0][i], symbol] in distributes[0]:
+                current = self.delta_functions.loc[distributes[0][i], symbol]
+                if current in distributes[0]:
                     unf_mat[i].append(0)
-                else:
+                elif current in distributes[1]:
                     unf_mat[i].append(1)
+                else:
+                    unf_mat[i].append(None)
 
                 if j == len(self.terminal_set) - 1:
                     unf_mat[i].append(distributes[0][i])
@@ -102,14 +105,17 @@ class FA:
         for i in range(len(distributes[1])):
             for j in range(len(self.terminal_set)):
                 symbol = sorted(self.terminal_set)[j]
-                if self.delta_functions.loc[distributes[1][i], symbol] in distributes[0]:
+                current = self.delta_functions.loc[distributes[1][i], symbol]
+                if current in distributes[0]:
                     f_mat[i].append(0)
-                else:
+                elif current in distributes[1]:
                     f_mat[i].append(1)
+                else:
+                    f_mat[i].append(None)
 
                 if j == len(self.terminal_set) - 1:
                     f_mat[i].append(distributes[1][i])
-
+        
         ptr = 0
         d_list = [[unf_mat[ptr].pop()]]
 
@@ -146,9 +152,14 @@ class FA:
         for i in range(len(d_list)):
             for symbol in sorted(self.terminal_set):
                 for k in range(len(d_list)):
-                    if self.delta_functions.loc[d_list[i][0], symbol] in d_list[k]:
+                    current = self.delta_functions.loc[sorted(d_list)[i][0], symbol]
+                    if not current:
+                        df_dict[symbol].append(None)
+                        break
+                    if current in d_list[k]:
                         df_dict[symbol].append(set(d_list[k]))
 
+        print(df_dict)
         self.delta_functions = pd.DataFrame(df_dict)
         print(self.delta_functions)
         for i in range(len(d_list)):
