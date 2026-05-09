@@ -177,7 +177,7 @@ class FA:
         # 치환
         self.replace_dfa(d_list)
         print(self.delta_functions)
-        self.fa_type == 'RDFA'
+        self.fa_type = 'RDFA'
 
     def extend_state(self, df_dict:dict, transferable_states:list):
         cnt = 0
