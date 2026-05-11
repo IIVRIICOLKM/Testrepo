@@ -70,7 +70,40 @@ class FA:
         self.replace_dfa(transferable_states)
         self.fa_type = 'DFA'
 
-        
+    def state_distribution(self, dist_sets:list, processing_idx:int):
+        ptr = 0
+        state_mat = []
+
+        for i in range(len(dist_sets[processing_idx])):
+            state_mat.append([])
+
+        for i in range(len(dist_sets[processing_idx])):
+            for j in range(len(self.terminal_set)):
+                symbol = sorted(self.terminal_set)[j]
+                current = self.delta_functions.loc[dist_sets[processing_idx][i], symbol]
+                if current in dist_sets[0]:
+                    state_mat[i].append(0)
+                elif current in dist_sets[1]:
+                    state_mat[i].append(1)
+                else:
+                    state_mat[i].append(None)
+
+                if j == len(self.terminal_set) - 1:
+                    state_mat[i].append(dist_sets[processing_idx][i])
+
+        d_list = [[state_mat[ptr].pop()]]
+
+        for i in range(1, len(state_mat)):
+            current = state_mat[i].pop()
+            if state_mat[i - 1] == state_mat[i]:
+                d_list[ptr].append(current)
+            else:
+                d_list.append([])
+                ptr += 1
+                d_list[ptr].append(current)
+
+        return d_list
+
     def dfa_to_rdfa(self):
         if self.fa_type != 'DFA':
             print(f'현재 타입은 {self.fa_type}입니다.')
@@ -79,69 +112,8 @@ class FA:
         unfinal_state_set = self.state_set - self.final_state_set
         distributes = [sorted(unfinal_state_set), sorted(self.final_state_set)]
 
-        unf_mat = []
-        f_mat = []
-
-        for i in range(len(distributes[0])):
-            unf_mat.append([])
-
-        for i in range(len(distributes[1])):
-            f_mat.append([])
-
-        for i in range(len(distributes[0])):
-            for j in range(len(self.terminal_set)):
-                symbol = sorted(self.terminal_set)[j]
-                current = self.delta_functions.loc[distributes[0][i], symbol]
-                if current in distributes[0]:
-                    unf_mat[i].append(0)
-                elif current in distributes[1]:
-                    unf_mat[i].append(1)
-                else:
-                    unf_mat[i].append(None)
-
-                if j == len(self.terminal_set) - 1:
-                    unf_mat[i].append(distributes[0][i])
-
-        for i in range(len(distributes[1])):
-            for j in range(len(self.terminal_set)):
-                symbol = sorted(self.terminal_set)[j]
-                current = self.delta_functions.loc[distributes[1][i], symbol]
-                if current in distributes[0]:
-                    f_mat[i].append(0)
-                elif current in distributes[1]:
-                    f_mat[i].append(1)
-                else:
-                    f_mat[i].append(None)
-
-                if j == len(self.terminal_set) - 1:
-                    f_mat[i].append(distributes[1][i])
-        
-        ptr = 0
-        d_list = [[unf_mat[ptr].pop()]]
-
-        for i in range(1, len(unf_mat)):
-            current = unf_mat[i].pop()
-            if unf_mat[i - 1] == unf_mat[i]:
-                d_list[ptr].append(current)
-            else:
-                d_list.append([])
-                ptr += 1
-                d_list[ptr].append(current)
-
-            if i == len(unf_mat) - 1:
-                ptr = 0
-
-        d1_list = [[f_mat[ptr].pop()]]
-
-        for i in range(1, len(f_mat)):
-            current = f_mat[i].pop()
-            if f_mat[i - 1] == f_mat[i]:
-                d1_list[ptr].append(current)
-            else:
-                d1_list.append([])
-                ptr += 1
-                d1_list[ptr].append(current)
-        
+        d_list = self.state_distribution(distributes, 0)
+        d1_list = self.state_distribution(distributes, 1)
         for i in range(len(d1_list)):
             d_list.append(d1_list[i])
 
@@ -159,13 +131,11 @@ class FA:
                     if current in d_list[k]:
                         df_dict[symbol].append(set(d_list[k]))
 
-        print(df_dict)
         self.delta_functions = pd.DataFrame(df_dict)
         print(self.delta_functions)
         for i in range(len(d_list)):
             d_list[i] = set(d_list[i])
 
-        self.delta_functions.index = d_list
         indexs = ['A'] * len(d_list)
 
         for i in range(len(d_list)):
