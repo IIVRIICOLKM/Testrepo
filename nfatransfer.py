@@ -85,28 +85,28 @@ class FA:
         self.show_states_information()
         self.fa_type = 'DFA'
 
-    def state_distribution(self, dist_sets:list, processing_idx:int) -> list:
+    def state_distribution(self, dist_list:list, processing_idx:int) -> list:
         # State Matrix 생성 및 초기화
         state_mat = []
-        dist_size = len(dist_sets)
-        dist_set_size = len(dist_sets[processing_idx])
+        dist_size = len(dist_list)
+        dist_list_size = len(dist_list[processing_idx])
 
-        for i in range(dist_set_size):
+        for i in range(dist_list_size):
             state_mat.append([])
 
         # 상태 넘버링
-        for i in range(dist_set_size):
+        for i in range(dist_list_size):
             for j in range(len(self.terminal_set)):
                 symbol = sorted(self.terminal_set)[j]
-                current = self.delta_functions.loc[dist_sets[processing_idx][i], symbol]
+                current = self.delta_functions.loc[dist_list[processing_idx][i], symbol]
                 for k in range(dist_size):
-                    if current in dist_sets[k]:
+                    if current in dist_list[k]:
                         state_mat[i].append(k)
                     elif k == dist_size - 1:
                         state_mat[i].append(-1)
                 # 마지막에 문자 추가
                 if j == len(self.terminal_set) - 1:
-                    state_mat[i].append(dist_sets[processing_idx][i])
+                    state_mat[i].append(dist_list[processing_idx][i])
         # State Matrix : ex) [[0, 0, 'A'], [0, 1, 'B'], [0, 1, 'D']]
 
         # 종결 상태와 시작 상태가 동일한경우 빈 리스트 반환
@@ -152,7 +152,6 @@ class FA:
             d_lists = updated_d_lists
             if not sum(distributable_checks):
                 break
-        
         df_dict = {}
         for i in range(len(self.terminal_set)):
             df_dict[sorted(self.terminal_set)[i]] = []
@@ -203,14 +202,16 @@ class FA:
                         if self.fa_type == 'EPS-NFA':
                             cnt_inner = 0
                             while True:
-                                print(searcing_state_set)
                                 idx = list(searcing_state_set)[cnt_inner]
-                                print(idx)
                                 if idx in self.delta_functions.index and self.delta_functions.loc[idx, 'ε'] != None:
-                                    searcing_state_set = searcing_state_set.union(self.delta_functions.loc[idx, 'ε'])
+                                    searcing_state_set = list(searcing_state_set)
+                                    # 카운터 기반이기 때문에 추가되는 순서를 기억해야함
+                                    for i in range(len(self.delta_functions.loc[idx, 'ε'])):
+                                        searcing_state_set.append(list(self.delta_functions.loc[idx, 'ε'])[i])
                                 cnt_inner += 1
 
                                 if len(searcing_state_set) == cnt_inner:
+                                    searcing_state_set = set(searcing_state_set)
                                     break
                         # 조회된 이동 가능 상태를 확장
                         extended_state_set = extended_state_set.union(searcing_state_set)
@@ -229,16 +230,20 @@ class FA:
 
     def replace_dfa(self, transferable_states:list):
         alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
+        
+        size = len(transferable_states)
         # DFA는 이미 알파벳으로 치환된 상태이기 때문에 기존 상태집합 정렬
         if self.fa_type == 'DFA':
-            for i in range(len(transferable_states)):
-                transferable_states[i] = list(transferable_states[i])
-
-            transferable_states = sorted(transferable_states)
-
-            for i in range(len(transferable_states)):
-                transferable_states[i] = frozenset(transferable_states[i])
+            for i in range(size):
+                transferable_states[i] = sorted(transferable_states[i])
+            
+            for i in range(size - 1, 0, -1):
+                for j in range(0, i):
+                    if transferable_states[j] > transferable_states[j + 1]:
+                        transferable_states[j], transferable_states[j + 1] = transferable_states[j + 1], transferable_states[j]
+            
+            for i in range(size):
+                transferable_states[i] = set(transferable_states[i])
 
         # 시작, 종결 상태 초기화
         self.state_set.clear()
@@ -252,7 +257,7 @@ class FA:
         # 시작 상태, 종결 상태 탐색 및 치환
         for index in self.delta_functions.index:
             for symbol in self.terminal_set:
-                for i in range(len(transferable_states)):
+                for i in range(size):
                     # 종결 상태에 대한 치환
                     for j in range(len(tmp)):
                         if list(tmp)[j] in transferable_states[i]:

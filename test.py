@@ -74,8 +74,5 @@
 # else:
 #     print('not all 0')
 
-temp = []
-temp += [[1, 2, 3]]
-temp += [[4, 5, 6]]
-temp += []
-print(frozenset({1, 2, 3}))
+temp = [['B'], ['A'], ['C']]
+print(temp[0] > temp[1])

@@ -1,21 +1,31 @@
 DeltaFunctions = {
 
-(q001, a) = {q002}
+(q001, ε) = {q002, q008}
 
-(q001, ε) = {q003}
+(q002, ε) = {q003, q005}
 
-(q002, b) = {q004}
+(q003, a) = {q004}
 
-(q003, c) = {q003}
+(q004, ε) = {q007}
 
-(q003, ε) = {q004}
+(q005, b) = {q006}
+
+(q006, ε) = {q007}
+
+(q007, ε) = {q001, q008}
+
+(q008, a) = {q009}
+
+(q009, b) = {q010}
+
+(q010, b) = {q011}
 
 }
 
-StateSet = { q001, q002, q003, q004 }
+StateSet = { q001, q002, q003, q004, q005, q006, q007, q008, q009, q010, q011 }
 
-TerminalSet = { a, b, c }
+TerminalSet = { a, b }
 
 StartState = { q001 }
 
-FinalStateSet = { q004 }
+FinalStateSet = { q011 }
