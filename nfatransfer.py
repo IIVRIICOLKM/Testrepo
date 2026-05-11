@@ -215,10 +215,11 @@ class FA:
         for index in self.delta_functions.index:
             for symbol in self.terminal_set:
                 for i in range(len(transferable_states)):
+                    # 종결 상태에 대한 치환
                     for j in range(len(tmp)):
                         if list(tmp)[j] in transferable_states[i]:
                             self.final_state_set = self.final_state_set.union({alpha[i]})
-
+                    # 상태 알파벳 치환 및 상태집합 재구성
                     if self.delta_functions.loc[index, symbol] == transferable_states[i]:
                         self.delta_functions.loc[index, symbol] = alpha[i]
                         self.state_set = self.state_set.union({alpha[i]})
