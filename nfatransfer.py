@@ -9,14 +9,15 @@ class FA:
         self.delta_functions = delta_functions
         self.final_state_set = final_state_set
         self.terminal_set = terminal_set
-
         self.fa_type = 'EPS-NFA' if 'ε' in self.delta_functions.columns else 'NFA'
 
+        # 초기 입력 DFA 식별
         cnt = 0
         for state in sorted(list(self.state_set)):
             for symbol in sorted(list(self.terminal_set)):
                 if state in self.delta_functions.index and self.delta_functions.loc[state, symbol] != None and len(self.delta_functions.loc[state, symbol]) != 1:
                     cnt += 1
+        # DFA 조건 만족 시, 치환 진행
         if self.fa_type != 'EPS-NFA' and cnt == 0:
             states = []
             for state in sorted(self.state_set):
@@ -33,15 +34,16 @@ class FA:
             self.fa_type = 'DFA'
 
     def nfa_to_dfa(self):
+        # 조기 종료
         if self.fa_type != 'NFA' and self.fa_type != 'EPS-NFA':
             print(f'현재 타입은 {self.fa_type}입니다.')
             return
+        # 딕셔너리 테이블 칼럼(터미널 심볼) 초기화
         df_dict = {}
         for i in range(len(self.terminal_set)):
             df_dict[sorted(list(self.terminal_set))[i]] = []
 
-        transferable_states = []
-
+        # 시작 상태에 대한 ε-Closure 연산
         if self.fa_type == 'EPS-NFA':
             cnt = 0
             while True:
@@ -52,31 +54,31 @@ class FA:
                 cnt += 1
                 if cnt == len(self.start_set):
                     break
-
+        
+        # 상태 확장 및 데이터프레임 생성
+        transferable_states = []
         transferable_states.append(self.start_set)
         self.extend_state(df_dict, transferable_states)
-        # 데이터프레임 변경 및 인덱스 설정
         self.delta_functions = pd.DataFrame(df_dict)
-        self.delta_functions.index = transferable_states
-        indexs = ['A'] * len(transferable_states)
 
+        # 데이터프레임 인덱스 치환
+        indexs = ['A'] * len(transferable_states)
         for i in range(len(transferable_states)):
             alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             indexs[i] = alpha[i]
-
         self.delta_functions.index = indexs
-        
-        # 치환
+
+        # 데이터 프레임 전체 치환 및 타입 변경
         self.replace_dfa(transferable_states)
         self.fa_type = 'DFA'
 
     def state_distribution(self, dist_sets:list, processing_idx:int):
-        ptr = 0
+        # State Matrix 생성 및 초기화
         state_mat = []
-
         for i in range(len(dist_sets[processing_idx])):
             state_mat.append([])
 
+        # 상태 넘버링
         for i in range(len(dist_sets[processing_idx])):
             for j in range(len(self.terminal_set)):
                 symbol = sorted(self.terminal_set)[j]
@@ -87,14 +89,18 @@ class FA:
                     state_mat[i].append(1)
                 else:
                     state_mat[i].append(None)
-
+                # 마지막에 문자 추가
                 if j == len(self.terminal_set) - 1:
                     state_mat[i].append(dist_sets[processing_idx][i])
-
+        # State Matrix : ex) [[0, 0, 'A'], [0, 1, 'B'], [0, 1, 'D']]
+        state_mat = sorted(state_mat)
+        ptr = 0
         d_list = [[state_mat[ptr].pop()]]
 
+        # 집합 분해 후 결괏값 반환
         for i in range(1, len(state_mat)):
             current = state_mat[i].pop()
+            # 문자 제거 후 일치 여부 비교
             if state_mat[i - 1] == state_mat[i]:
                 d_list[ptr].append(current)
             else:
@@ -109,9 +115,11 @@ class FA:
             print(f'현재 타입은 {self.fa_type}입니다.')
             return
         
+        # 종결, 비종결 상태 분해
         unfinal_state_set = self.state_set - self.final_state_set
         distributes = [sorted(unfinal_state_set), sorted(self.final_state_set)]
 
+        # 동류 집합 재결합
         d_list = self.state_distribution(distributes, 0)
         d1_list = self.state_distribution(distributes, 1)
         for i in range(len(d1_list)):
@@ -121,6 +129,7 @@ class FA:
         for i in range(len(self.terminal_set)):
             df_dict[sorted(self.terminal_set)[i]] = []
 
+        # 재결합 후 델타펑션 리뉴얼
         for i in range(len(d_list)):
             for symbol in sorted(self.terminal_set):
                 for k in range(len(d_list)):
@@ -130,21 +139,19 @@ class FA:
                         break
                     if current in d_list[k]:
                         df_dict[symbol].append(set(d_list[k]))
-
         self.delta_functions = pd.DataFrame(df_dict)
         print(self.delta_functions)
+
+        # 인덱스 치환
         for i in range(len(d_list)):
             d_list[i] = set(d_list[i])
-
         indexs = ['A'] * len(d_list)
-
         for i in range(len(d_list)):
             alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             indexs[i] = alpha[i]
-
         self.delta_functions.index = indexs
         
-        # 치환
+        # DFA 치환 및 타입 변경
         self.replace_dfa(d_list)
         print(self.delta_functions)
         self.fa_type = 'RDFA'
@@ -152,15 +159,20 @@ class FA:
     def extend_state(self, df_dict:dict, transferable_states:list):
         cnt = 0
         while True:
+            # delta_states : 현재까지 탐색된 전이 가능 상태
             delta_states = list(transferable_states[cnt])
+            # 심볼 단위 탐색
             for symbol in sorted(list(self.terminal_set)):
                 extended_state_set = set()
+                # delta_states 리스트 내의 상태 집합의 구성 원소
                 for delta_state in delta_states:
+                    # 원자 상태의 심볼 조회 시 이동 가능 상태 파악 
                     searcing_state_set = self.delta_functions.loc[delta_state, symbol] \
                         if delta_state in self.delta_functions.index \
                         else None
-            
+                    # 공집합 제외
                     if searcing_state_set != None:
+                        # ε-Closure 연산
                         if self.fa_type == 'EPS-NFA':
                             cnt_inner = 0
                             while True:
@@ -172,9 +184,9 @@ class FA:
 
                                 if len(searcing_state_set) == cnt_inner:
                                     break
-                                      
+                        # 조회된 이동 가능 상태를 확장
                         extended_state_set = extended_state_set.union(searcing_state_set)
-
+                # 딕셔너리에 확장된 원소 상태 삽입
                 if len(extended_state_set) != 0:
                     df_dict[symbol].append(extended_state_set) 
                     if extended_state_set not in transferable_states:
@@ -182,6 +194,7 @@ class FA:
                 else: 
                     df_dict[symbol].append(None)
 
+            # 반복 종료 : 전이 가능 상태 다 탐색
             cnt += 1
             if cnt == len(transferable_states):
                 break
@@ -189,12 +202,16 @@ class FA:
     def replace_dfa(self, transferable_states:list):
         alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+        # 시작, 종결 상채 초기화
         self.state_set.clear()
         tmp = copy.deepcopy(self.final_state_set)
         self.final_state_set.clear()
+
+        # 시작 상태를 A로 설정
         self.start_set = {'A'}
         self.state_set = self.state_set.union(self.start_set)
 
+        # 시작 상태, 종결 상태 탐색 및 치환
         for index in self.delta_functions.index:
             for symbol in self.terminal_set:
                 for i in range(len(transferable_states)):
