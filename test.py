@@ -48,11 +48,34 @@
 
 # print(sorted([[1, 1, 'A'], [2, 1, 'B'], [2, 2, 'C'], [1, 1, 'D'], [1, 2, 'E'], [2, 1, 'F']]))
 
-import pandas as pd
+# import pandas as pd
 
-testdict = {'a':[['B', 'D'], ['B', 'D'], ['B', 'D']],
-            'b':[['B', 'D'], ['C', 'E'], ['C', 'E']]}
-df = pd.DataFrame(testdict)
+# testdict = {'a':[['B', 'D'], ['B', 'D'], ['B', 'D']],
+#             'b':[['B', 'D'], ['C', 'E'], ['C', 'E']]}
+# df = pd.DataFrame(testdict)
 
-df.index = ({'A'}, {'B', 'D'}, {'C', 'E'})
-print(df)
+# df.index = ({'A'}, {'B', 'D'}, {'C', 'E'})
+# print(df)
+
+# from pathlib import Path
+
+# for p in Path('inputs').iterdir():
+#    print(p)
+#    print(sorted([]))
+
+#    with open(p, 'r', encoding='utf-8') as f:
+#        print('success')
+
+# print(sorted([['A'], ['C'], ['B'], ['D', 'E']]))
+
+# zerochecker = [False, False, False]
+# if not sum(zerochecker):
+#     print('all 0')
+# else:
+#     print('not all 0')
+
+temp = []
+temp += [[1, 2, 3]]
+temp += [[4, 5, 6]]
+temp += []
+print(frozenset({1, 2, 3}))

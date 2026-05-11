@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 import copy
+from pathlib import Path
 
 class FA:
     def __init__(self, state_set:set, start_set:set, delta_functions:pd.DataFrame, final_state_set:set, terminal_set:set):
@@ -33,10 +34,18 @@ class FA:
             self.replace_dfa(states)
             self.fa_type = 'DFA'
 
+    def show_states_information(self):
+        print(f'----------------- 매핑 함수 -----------------')
+        print(self.delta_functions)
+        print(f'--------------------------------------------')
+        print(f'현재 상태 집합 : {sorted(self.state_set)}')
+        print(f'현재 시작 상태 : {sorted(self.start_set)}')
+        print(f'현재 종결 상태 : {sorted(self.final_state_set)}', end='\n\n')
+
     def nfa_to_dfa(self):
         # 조기 종료
         if self.fa_type != 'NFA' and self.fa_type != 'EPS-NFA':
-            print(f'현재 타입은 {self.fa_type}입니다.')
+            print(f'현재 타입은 {self.fa_type}입니다.', end='\n\n')
             return
         # 딕셔너리 테이블 칼럼(터미널 심볼) 초기화
         df_dict = {}
@@ -61,6 +70,8 @@ class FA:
         self.extend_state(df_dict, transferable_states)
         self.delta_functions = pd.DataFrame(df_dict)
 
+        self.delta_functions.index = transferable_states
+        print(self.delta_functions, end='\n\n')
         # 데이터프레임 인덱스 치환
         indexs = ['A'] * len(transferable_states)
         for i in range(len(transferable_states)):
@@ -70,29 +81,38 @@ class FA:
 
         # 데이터 프레임 전체 치환 및 타입 변경
         self.replace_dfa(transferable_states)
+
+        self.show_states_information()
         self.fa_type = 'DFA'
 
-    def state_distribution(self, dist_sets:list, processing_idx:int):
+    def state_distribution(self, dist_sets:list, processing_idx:int) -> list:
         # State Matrix 생성 및 초기화
         state_mat = []
-        for i in range(len(dist_sets[processing_idx])):
+        dist_size = len(dist_sets)
+        dist_set_size = len(dist_sets[processing_idx])
+
+        for i in range(dist_set_size):
             state_mat.append([])
 
         # 상태 넘버링
-        for i in range(len(dist_sets[processing_idx])):
+        for i in range(dist_set_size):
             for j in range(len(self.terminal_set)):
                 symbol = sorted(self.terminal_set)[j]
                 current = self.delta_functions.loc[dist_sets[processing_idx][i], symbol]
-                if current in dist_sets[0]:
-                    state_mat[i].append(0)
-                elif current in dist_sets[1]:
-                    state_mat[i].append(1)
-                else:
-                    state_mat[i].append(None)
+                for k in range(dist_size):
+                    if current in dist_sets[k]:
+                        state_mat[i].append(k)
+                    elif k == dist_size - 1:
+                        state_mat[i].append(-1)
                 # 마지막에 문자 추가
                 if j == len(self.terminal_set) - 1:
                     state_mat[i].append(dist_sets[processing_idx][i])
         # State Matrix : ex) [[0, 0, 'A'], [0, 1, 'B'], [0, 1, 'D']]
+
+        # 종결 상태와 시작 상태가 동일한경우 빈 리스트 반환
+        if len(state_mat) == 0:
+            return state_mat
+        
         state_mat = sorted(state_mat)
         ptr = 0
         d_list = [[state_mat[ptr].pop()]]
@@ -117,43 +137,50 @@ class FA:
         
         # 종결, 비종결 상태 분해
         unfinal_state_set = self.state_set - self.final_state_set
-        distributes = [sorted(unfinal_state_set), sorted(self.final_state_set)]
+        d_lists = [sorted(unfinal_state_set), sorted(self.final_state_set)]
 
-        # 동류 집합 재결합
-        d_list = self.state_distribution(distributes, 0)
-        d1_list = self.state_distribution(distributes, 1)
-        for i in range(len(d1_list)):
-            d_list.append(d1_list[i])
+        while True:
+            updated_d_lists = []
+            distributable_checks = []
+            dists_size = len(d_lists)
+            # 부분집합별 상태 검사
+            for i in range(dists_size):
+                updated_d_list = self.state_distribution(d_lists, i)
+                distributable_checks.append(len(updated_d_list) > 1)
+                updated_d_lists += updated_d_list
 
+            d_lists = updated_d_lists
+            if not sum(distributable_checks):
+                break
+        
         df_dict = {}
         for i in range(len(self.terminal_set)):
             df_dict[sorted(self.terminal_set)[i]] = []
 
         # 재결합 후 델타펑션 리뉴얼
-        for i in range(len(d_list)):
+        dists_size = len(d_lists)
+        for i in range(dists_size):
             for symbol in sorted(self.terminal_set):
-                for k in range(len(d_list)):
-                    current = self.delta_functions.loc[sorted(d_list)[i][0], symbol]
+                for k in range(dists_size):
+                    current = self.delta_functions.loc[sorted(d_lists)[i][0], symbol]
                     if not current:
                         df_dict[symbol].append(None)
                         break
-                    if current in d_list[k]:
-                        df_dict[symbol].append(set(d_list[k]))
+                    if current in d_lists[k]:
+                        df_dict[symbol].append(set(d_lists[k]))
         self.delta_functions = pd.DataFrame(df_dict)
-        print(self.delta_functions)
 
         # 인덱스 치환
-        for i in range(len(d_list)):
-            d_list[i] = set(d_list[i])
-        indexs = ['A'] * len(d_list)
-        for i in range(len(d_list)):
+        for i in range(dists_size):
+            d_lists[i] = set(d_lists[i])
+        indexs = ['A'] * len(d_lists)
+        for i in range(dists_size):
             alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             indexs[i] = alpha[i]
         self.delta_functions.index = indexs
-        
         # DFA 치환 및 타입 변경
-        self.replace_dfa(d_list)
-        print(self.delta_functions)
+        self.replace_dfa(d_lists)
+        self.show_states_information()
         self.fa_type = 'RDFA'
 
     def extend_state(self, df_dict:dict, transferable_states:list):
@@ -176,8 +203,9 @@ class FA:
                         if self.fa_type == 'EPS-NFA':
                             cnt_inner = 0
                             while True:
-                                idx = sorted(list(searcing_state_set))[cnt_inner]
-
+                                print(searcing_state_set)
+                                idx = list(searcing_state_set)[cnt_inner]
+                                print(idx)
                                 if idx in self.delta_functions.index and self.delta_functions.loc[idx, 'ε'] != None:
                                     searcing_state_set = searcing_state_set.union(self.delta_functions.loc[idx, 'ε'])
                                 cnt_inner += 1
@@ -202,7 +230,17 @@ class FA:
     def replace_dfa(self, transferable_states:list):
         alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-        # 시작, 종결 상채 초기화
+        # DFA는 이미 알파벳으로 치환된 상태이기 때문에 기존 상태집합 정렬
+        if self.fa_type == 'DFA':
+            for i in range(len(transferable_states)):
+                transferable_states[i] = list(transferable_states[i])
+
+            transferable_states = sorted(transferable_states)
+
+            for i in range(len(transferable_states)):
+                transferable_states[i] = frozenset(transferable_states[i])
+
+        # 시작, 종결 상태 초기화
         self.state_set.clear()
         tmp = copy.deepcopy(self.final_state_set)
         self.final_state_set.clear()
@@ -315,8 +353,17 @@ def preprocess(filename:str)->tuple:
 
         return inform_dict, df
 
-inform_dict, delta_functions = preprocess('input_dfa.txt')
+if __name__ == '__main__':
 
-fa_test = FA(inform_dict['StateSet'], inform_dict['StartState'], delta_functions, inform_dict['FinalStateSet'], inform_dict['TerminalSet'])
-fa_test.nfa_to_dfa()
-fa_test.dfa_to_rdfa()
+    for p in Path('inputs').iterdir():
+        print(f'-----------------------------------------------------------------------------------------------------', end='\n\n')
+        inform_dict, delta_functions = preprocess(p)
+
+        fa_test = FA(inform_dict['StateSet'], inform_dict['StartState'], delta_functions, inform_dict['FinalStateSet'], inform_dict['TerminalSet'])
+
+        print(f'---------- 입력 {p} NFA -> DFA 변환 결과 ----------', end='\n\n')
+        fa_test.nfa_to_dfa()
+        print(f'------------------------------------------------------------------', end='\n\n')
+        print(f'---------- 입력 {p} DFA -> RDFA 변환 결과 ----------', end='\n\n')
+        fa_test.dfa_to_rdfa()
+        print(f'------------------------------------------------------------------', end='\n\n')
